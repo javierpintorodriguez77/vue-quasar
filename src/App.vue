@@ -1,11 +1,12 @@
 <template>
   <q-layout view="lHh Lpr lFf" class="bg-grey-2 text-body">
+    <!-- Header Principal -->
     <q-header elevated class="bg-primary text-white">
-      <q-toolbar>
-        <q-icon name="build" size="md" class="q-mr-sm" />
+      <q-toolbar class="q-py-xs">
+        <q-icon name="build_circle" size="md" class="q-mr-sm" />
         <q-toolbar-title class="text-weight-bold">
           Taller Don Efraín
-          <div class="text-caption text-weight-regular">Servicio Técnico Móvil</div>
+          <div class="text-caption text-weight-regular text-grey-4">Servicio Técnico Móvil</div>
         </q-toolbar-title>
         <q-btn
           color="secondary"
@@ -14,7 +15,7 @@
           @click="abrirModalCrear"
           unelevated
           rounded
-          class="text-weight-bold"
+          class="text-weight-bold q-px-md"
         />
       </q-toolbar>
     </q-header>
@@ -22,10 +23,11 @@
     <q-page-container class="q-pa-md">
       <q-page>
         <!-- Estado Vacío -->
-        <div v-if="servicios.length === 0" class="text-center q-pa-xl">
-          <q-icon name="assignment_late" size="4.5rem" color="grey-6" />
-          <div class="text-h6 text-grey-7 q-mt-md">No hay servicios registrados aún.</div>
-          <div class="text-subtitle1 text-grey-6">Haz clic en "Nuevo Servicio" para registrar un equipo.</div>
+        <div v-if="servicios.length === 0" class="text-center q-pa-xl bg-white rounded-borders shadow-1 q-my-lg">
+          <q-icon name="assignment_late" size="5rem" color="grey-5" />
+          <div class="text-h6 text-grey-8 q-mt-md text-weight-medium">No hay servicios registrados aún</div>
+          <div class="text-subtitle1 text-grey-6 q-mb-md">Haz clic en el botón para registrar un nuevo equipo.</div>
+          <q-btn color="primary" icon="add" label="Registrar Primer Servicio" @click="abrirModalCrear" unelevated />
         </div>
 
         <!-- Tarjetas de Servicios -->
@@ -43,14 +45,17 @@
                 'bg-orange-1 border-orange': servicio.estadoPago === 'abono',
                 'bg-white': servicio.estadoPago === 'pagado'
               }"
-              class="servicio-card"
+              class="servicio-card shadow-2 transition-generic"
             >
-              <q-card-section class="q-pb-xs">
-                <div class="row items-center no-wrap">
-                  <div class="col">
-                    <div class="text-h6 text-bold text-grey-9">{{ servicio.cliente || 'Sin nombre' }}</div>
-                    <div class="text-subtitle1 text-primary text-bold">
-                      <q-icon name="smartphone" /> {{ servicio.marca }} {{ servicio.modelo }}
+              <q-card-section class="q-pb-sm">
+                <div class="row items-center no-wrap justify-between">
+                  <div class="col ellipsis q-pr-sm">
+                    <div class="text-h6 text-bold text-grey-9 ellipsis">
+                      {{ servicio.cliente || 'Sin nombre' }}
+                    </div>
+                    <div class="text-subtitle1 text-primary text-bold row items-center">
+                      <q-icon name="smartphone" class="q-mr-xs" />
+                      <span>{{ servicio.marca }} {{ servicio.modelo }}</span>
                     </div>
                   </div>
 
@@ -59,7 +64,7 @@
                       :color="obtenerColorEstadoEquipo(servicio.estadoEquipo)"
                       text-color="white"
                       size="md"
-                      class="text-weight-bold"
+                      class="text-weight-bold shadow-1"
                     >
                       <q-icon :name="obtenerIconoEstadoEquipo(servicio.estadoEquipo)" class="q-mr-xs" />
                       {{ servicio.estadoEquipo }}
@@ -70,49 +75,49 @@
 
               <q-separator />
 
-              <q-card-section class="q-py-sm text-body1">
-                <div><strong>Reparación:</strong> {{ servicio.tipoReparacion || 'No especificada' }}</div>
-                <div><strong>Técnico:</strong> {{ servicio.tecnico }}</div>
-                <div><strong>Fecha/Hora:</strong> {{ servicio.fechaHora }}</div>
-                <div><strong>Precio Total:</strong> ${{ servicio.precio }}</div>
+              <q-card-section class="q-py-sm text-body1 q-gutter-xs">
+                <div><span class="text-weight-bold">Reparación:</span> {{ servicio.tipoReparacion || 'No especificada' }}</div>
+                <div><span class="text-weight-bold">Técnico:</span> {{ servicio.tecnico }}</div>
+                <div><span class="text-weight-bold">Fecha/Hora:</span> {{ servicio.fechaHora }}</div>
+                <div><span class="text-weight-bold">Precio Total:</span> <span class="text-weight-bolder">${{ servicio.precio }}</span></div>
                 
-                <div v-if="servicio.estadoPago === 'abono'">
-                  <strong>Monto Abonado:</strong> ${{ servicio.valorAbono }} 
+                <div v-if="servicio.estadoPago === 'abono'" class="bg-orange-2 q-pa-xs rounded-borders">
+                  <span class="text-weight-bold">Abonado:</span> ${{ servicio.valorAbono }} 
                   <span class="text-negative text-bold"> (Resta: ${{ servicio.precio - servicio.valorAbono }})</span>
                 </div>
 
-                <div>
-                  <strong>Pago:</strong> 
+                <div class="row items-center q-mt-xs">
+                  <span class="text-weight-bold q-mr-xs">Estado Pago:</span>
                   <q-badge
                     :color="servicio.estadoPago === 'pagado' ? 'positive' : (servicio.estadoPago === 'abono' ? 'warning' : 'negative')"
-                    class="q-ml-xs text-caption text-bold"
+                    class="text-caption text-bold q-px-sm q-py-xs"
                   >
                     {{ servicio.estadoPago.toUpperCase() }} ({{ servicio.metodoPago }})
                   </q-badge>
                 </div>
 
                 <!-- Calificación directa en la tarjeta si está entregado -->
-                <div v-if="servicio.estadoEquipo === 'entregado'" class="q-mt-sm bg-grey-3 q-pa-sm rounded-borders text-center">
-                  <div class="text-weight-bold text-grey-9">Calificación del cliente:</div>
+                <div v-if="servicio.estadoEquipo === 'entregado'" class="q-mt-sm bg-grey-3 q-pa-sm rounded-borders text-center shadow-1">
+                  <div class="text-weight-bold text-grey-9 text-caption">Calificación del cliente</div>
                   <q-rating
                     v-model="servicio.calificacion"
                     max="5"
-                    size="2em"
-                    color="orange-9"
+                    size="1.8em"
+                    color="amber-9"
                     icon="star_border"
                     icon-selected="star"
                   />
                 </div>
 
-                <div v-if="servicio.observaciones" class="q-mt-xs text-italic text-grey-8">
-                  <strong>Obs:</strong> "{{ servicio.observaciones }}"
+                <div v-if="servicio.observaciones" class="q-mt-xs text-italic text-grey-8 bg-grey-2 q-pa-xs rounded-borders">
+                  <span class="text-weight-bold">Obs:</span> "{{ servicio.observaciones }}"
                 </div>
               </q-card-section>
 
               <q-separator />
 
               <!-- Acciones: Deshabilitadas si el estado es 'entregado' -->
-              <q-card-actions align="right">
+              <q-card-actions align="right" class="bg-grey-1">
                 <q-btn
                   flat
                   round
@@ -138,36 +143,42 @@
           </div>
         </div>
 
-        <q-page-sticky position="bottom-right" :offset="[18, 18]">
-          <q-btn fab icon="add" color="secondary" @click="abrirModalCrear" />
+        <!-- Botón flotante -->
+        <q-page-sticky position="bottom-right" :offset="[20, 20]">
+          <q-btn fab icon="add" color="secondary" @click="abrirModalCrear" class="shadow-4" />
         </q-page-sticky>
 
         <!-- Modal de Crear / Editar -->
-        <q-dialog v-model="modalAbierto" persistent>
-          <q-card style="width: 550px; max-width: 95vw;">
-            <q-card-section class="row items-center bg-primary text-white">
-              <div class="text-h6">{{ editandoIndex === null ? 'Registrar Servicio' : 'Editar Servicio' }}</div>
+        <q-dialog v-model="modalAbierto" persistent transition-show="scale" transition-hide="scale">
+          <q-card style="width: 550px; max-width: 95vw;" class="rounded-borders">
+            <q-card-section class="row items-center bg-primary text-white q-py-sm">
+              <q-icon name="edit_note" size="sm" class="q-mr-sm" />
+              <div class="text-h6 text-weight-bold">{{ editandoIndex === null ? 'Registrar Servicio' : 'Editar Servicio' }}</div>
               <q-space />
               <q-btn icon="close" flat round dense v-close-popup />
             </q-card-section>
 
-            <q-form @submit.prevent="guardarServicio" class="q-pa-md q-gutter-md text-body1">
+            <q-form @submit.prevent="guardarServicio" class="q-pa-md q-gutter-sm text-body1">
               <q-input
                 v-model="form.cliente"
                 label="Nombre del cliente"
                 outlined
                 dense
-              />
+              >
+                <template #prepend><q-icon name="person" /></template>
+              </q-input>
 
               <div class="row q-col-gutter-sm">
                 <div class="col-6">
                   <q-select
                     v-model="form.marca"
                     :options="opcionesMarcas"
-                    label="Marca del equipo"
+                    label="Marca"
                     outlined
                     dense
-                  />
+                  >
+                    <template #prepend><q-icon name="branding_watermark" /></template>
+                  </q-select>
                 </div>
                 <div class="col-6">
                   <q-input
@@ -176,7 +187,9 @@
                     hint="Ej: Galaxy A15, iPhone 13"
                     outlined
                     dense
-                  />
+                  >
+                    <template #prepend><q-icon name="smartphone" /></template>
+                  </q-input>
                 </div>
               </div>
 
@@ -186,7 +199,9 @@
                 label="Tipo de reparación"
                 outlined
                 dense
-              />
+              >
+                <template #prepend><q-icon name="build" /></template>
+              </q-select>
 
               <q-select
                 v-model="form.tecnico"
@@ -194,7 +209,9 @@
                 label="Técnico que atendió"
                 outlined
                 dense
-              />
+              >
+                <template #prepend><q-icon name="badge" /></template>
+              </q-select>
 
               <q-input
                 v-model.number="form.precio"
@@ -203,7 +220,9 @@
                 prefix="$"
                 outlined
                 dense
-              />
+              >
+                <template #prepend><q-icon name="payments" /></template>
+              </q-input>
 
               <div class="row q-col-gutter-sm">
                 <div class="col-6">
@@ -213,7 +232,9 @@
                     label="Método de pago"
                     outlined
                     dense
-                  />
+                  >
+                    <template #prepend><q-icon name="account_balance_wallet" /></template>
+                  </q-select>
                 </div>
                 <div class="col-6">
                   <q-select
@@ -222,7 +243,9 @@
                     label="Estado del pago"
                     outlined
                     dense
-                  />
+                  >
+                    <template #prepend><q-icon name="pending_actions" /></template>
+                  </q-select>
                 </div>
               </div>
 
@@ -235,8 +258,10 @@
                 prefix="$"
                 outlined
                 dense
-                class="bg-orange-1"
-              />
+                class="bg-orange-1 rounded-borders"
+              >
+                <template #prepend><q-icon name="price_check" color="warning" /></template>
+              </q-input>
 
               <!-- Selector de estado del equipo (Solo en Edición) -->
               <q-select
@@ -246,7 +271,9 @@
                 label="Estado del equipo"
                 outlined
                 dense
-              />
+              >
+                <template #prepend><q-icon name="sync" /></template>
+              </q-select>
 
               <q-input
                 v-model="form.observaciones"
@@ -256,32 +283,35 @@
                 outlined
                 dense
                 rows="2"
-              />
+              >
+                <template #prepend><q-icon name="notes" /></template>
+              </q-input>
 
-              <q-card-actions align="right" class="q-mt-md">
-                <q-btn label="Cancelar" color="grey" flat v-close-popup />
+              <q-card-actions align="right" class="q-mt-md q-px-none">
+                <q-btn label="Cancelar" color="grey-7" flat v-close-popup />
                 <q-btn
-                  :label="editandoIndex === null ? 'Guardar' : 'Actualizar'"
+                  :label="editandoIndex === null ? 'Guardar Servicio' : 'Actualizar Servicio'"
                   type="submit"
                   color="primary"
                   unelevated
+                  class="q-px-md"
                 />
               </q-card-actions>
             </q-form>
           </q-card>
         </q-dialog>
 
-        <!-- Modal de Confirmación de Eliminación -->
+        <!-- Modal Confirmación de Eliminación -->
         <q-dialog v-model="modalEliminarAbierto">
-          <q-card>
-            <q-card-section class="row items-center">
-              <q-avatar icon="warning" color="negative" text-color="white" />
-              <span class="q-ml-sm text-body1">¿Está seguro de que desea eliminar este registro?</span>
+          <q-card class="rounded-borders">
+            <q-card-section class="row items-center q-pb-none">
+              <q-avatar icon="warning" color="negative" text-color="white" class="shadow-1" />
+              <span class="q-ml-md text-subtitle1 text-weight-medium">¿Está seguro de que desea eliminar este registro?</span>
             </q-card-section>
 
-            <q-card-actions align="right">
-              <q-btn flat label="Cancelar" color="grey" v-close-popup />
-              <q-btn flat label="Eliminar" color="negative" @click="eliminarServicio" v-close-popup />
+            <q-card-actions align="right" class="q-pa-md">
+              <q-btn flat label="Cancelar" color="grey-7" v-close-popup />
+              <q-btn unelevated label="Eliminar" color="negative" @click="eliminarServicio" v-close-popup />
             </q-card-actions>
           </q-card>
         </q-dialog>
@@ -411,11 +441,11 @@ function obtenerIconoEstadoEquipo(estado) {
 
 <style scoped>
 .text-body {
-  font-size: 15px;
+  font-size: 14px;
 }
 .servicio-card {
-  font-size: 15px;
-  border-radius: 8px;
+  font-size: 14px;
+  border-radius: 10px;
 }
 .border-red {
   border: 2px solid #e53935 !important;
@@ -423,4 +453,5 @@ function obtenerIconoEstadoEquipo(estado) {
 .border-orange {
   border: 2px solid #fb8c00 !important;
 }
+</style>
 </style>
