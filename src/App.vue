@@ -7,6 +7,21 @@
           Taller Don Efraín
           <div class="text-caption text-weight-regular text-grey-4">Servicio Técnico Móvil</div>
         </q-toolbar-title>
+
+        <!-- BOTÓN PARA BORRAR ENTREGADOS -->
+        <q-btn
+          color="negative"
+          icon="cleaning_services"
+          label="Borrar Entregados"
+          @click="confirmarBorrarEntregados"
+          unelevated
+          rounded
+          class="text-weight-bold q-mr-sm"
+          :disable="!hayEntregados"
+        >
+          <q-tooltip v-if="!hayEntregados">No hay servicios entregados para borrar</q-tooltip>
+        </q-btn>
+
         <q-btn color="secondary" icon="add" label="Nuevo Servicio" @click="abrirModalCrear" unelevated rounded class="text-weight-bold q-px-md" />
       </q-toolbar>
     </q-header>
@@ -51,14 +66,31 @@
               <q-separator />
 
               <q-card-section class="q-py-sm text-body1 q-gutter-xs">
-                <div><span class="text-weight-bold">Reparación:</span> {{ servicio.tipoReparacion || 'No especificada' }}</div>
+                <!-- VISUALIZACIÓN DE MÚLTIPLES REPARACIONES -->
+                <div>
+                  <span class="text-weight-bold block q-mb-xs">Reparaciones:</span>
+                  <template v-if="Array.isArray(servicio.tipoReparacion) && servicio.tipoReparacion.length">
+                    <q-chip v-for="(rep, rIdx) in servicio.tipoReparacion" :key="rIdx" dense color="primary" text-color="white" icon="build" size="sm" class="q-mr-xs q-mb-xs">
+                      {{ rep }}
+                    </q-chip>
+                  </template>
+                  <template v-else-if="typeof servicio.tipoReparacion === 'string'">
+                    <q-chip dense color="primary" text-color="white" icon="build" size="sm">
+                      {{ servicio.tipoReparacion }}
+                    </q-chip>
+                  </template>
+                  <template v-else>
+                    <span class="text-grey-7 text-italic">No especificadas</span>
+                  </template>
+                </div>
+
                 <div><span class="text-weight-bold">Técnico:</span> {{ servicio.tecnico }}</div>
                 <div><span class="text-weight-bold">Fecha/Hora:</span> {{ servicio.fechaHora }}</div>
-                <div><span class="text-weight-bold">Precio Total:</span> <span class="text-weight-bolder">${{ servicio.precio }}</span></div>
+                <div><span class="text-weight-bold">Precio Total:</span> <span class="text-weight-bolder">${{ formatearMoneda(servicio.precio) }}</span></div>
 
                 <div v-if="servicio.estadoPago === 'abono'" class="bg-orange-2 q-pa-xs rounded-borders">
-                  <span class="text-weight-bold">Abonado:</span> ${{ servicio.valorAbono }}
-                  <span class="text-negative text-bold"> (Resta: ${{ servicio.precio - servicio.valorAbono }})</span>
+                  <span class="text-weight-bold">Abonado:</span> ${{ formatearMoneda(servicio.valorAbono) }}
+                  <span class="text-negative text-bold"> (Resta: ${{ formatearMoneda(servicio.precio - servicio.valorAbono) }})</span>
                 </div>
 
                 <div class="row items-center q-mt-xs">
@@ -96,7 +128,7 @@
           <q-btn fab icon="add" color="secondary" @click="abrirModalCrear" class="shadow-4" />
         </q-page-sticky>
 
-        <!-- MODAL FORMULARIO CON VALIDACIONES -->
+        <!-- MODAL FORMULARIO -->
         <q-dialog v-model="modalAbierto" persistent transition-show="scale" transition-hide="scale">
           <q-card style="width: 550px; max-width: 95vw;" class="rounded-borders">
             <q-card-section class="row items-center bg-primary text-white q-py-sm">
@@ -107,24 +139,47 @@
             </q-card-section>
 
             <q-form ref="formRef" @submit.prevent="guardarServicio" class="q-pa-md q-gutter-sm text-body1">
-              <q-input v-model="form.cliente" label="Nombre del cliente *" outlined dense :rules="[val => !!val || 'El nombre del cliente es obligatorio']">
+              <q-input 
+                v-model="form.cliente" 
+                label="Nombre del cliente *" 
+                outlined 
+                dense 
+                :rules="[val => (val && val.trim().length > 0) || 'Ingrese un nombre válido (no solo espacios)']" 
+              >
                 <template #prepend><q-icon name="person" /></template>
               </q-input>
 
               <div class="row q-col-gutter-sm">
                 <div class="col-6">
-                  <q-select v-model="form.marca" :options="opcionesMarcas" label="Marca *" outlined dense @update:model-value="alCambiarMarca" :rules="[val => !!val || 'Seleccione una marca']">
+                  <q-select v-model="form.marca" :options="opcionesMarcas" label="Marca *" outlined dense :rules="[val => !!val || 'Seleccione una marca']">
                     <template #prepend><q-icon name="branding_watermark" /></template>
                   </q-select>
                 </div>
                 <div class="col-6">
-                  <q-select v-model="form.modelo" :options="modelosDisponibles" label="Modelo *" outlined dense use-input fill-input hide-selected input-debounce="0" @new-value="crearModeloPersonalizado" :rules="[val => !!val || 'Seleccione o ingrese un modelo']">
+                  <q-input 
+                    v-model="form.modelo" 
+                    label="Modelo *" 
+                    hint="Ej: Galaxy A15, iPhone 13" 
+                    outlined 
+                    dense 
+                    :rules="[val => (val && val.trim().length > 0) || 'Escriba un modelo válido']"
+                  >
                     <template #prepend><q-icon name="smartphone" /></template>
-                  </q-select>
+                  </q-input>
                 </div>
               </div>
 
-              <q-select v-model="form.tipoReparacion" :options="opcionesReparacion" label="Tipo de reparación *" outlined dense :rules="[val => !!val || 'Seleccione la reparación']">
+              <!-- SELECCIÓN MÚLTIPLE DE REPARACIONES -->
+              <q-select 
+                v-model="form.tipoReparacion" 
+                :options="opcionesReparacion" 
+                label="Tipo(s) de reparación *" 
+                multiple 
+                use-chips 
+                outlined 
+                dense 
+                :rules="[val => (Array.isArray(val) && val.length > 0) || 'Seleccione al menos una reparación']"
+              >
                 <template #prepend><q-icon name="build" /></template>
               </q-select>
 
@@ -132,7 +187,16 @@
                 <template #prepend><q-icon name="badge" /></template>
               </q-select>
 
-              <q-input v-model.number="form.precio" type="number" label="Precio cobrado *" prefix="$" outlined dense :rules="[val => val > 0 || 'Ingrese un precio válido mayor a 0']">
+              <!-- PRECIO TOTAL -->
+              <q-input 
+                :model-value="formatearMoneda(form.precio)" 
+                @update:model-value="val => form.precio = desformatearNumero(val)" 
+                label="Precio cobrado *" 
+                prefix="$" 
+                outlined 
+                dense 
+                :rules="[val => desformatearNumero(val) > 0 || 'Ingrese un precio válido mayor a 0']"
+              >
                 <template #prepend><q-icon name="payments" /></template>
               </q-input>
 
@@ -143,21 +207,51 @@
                   </q-select>
                 </div>
                 <div class="col-6">
-                  <q-select v-model="form.estadoPago" :options="opcionesEstadoPago" label="Estado del pago" outlined dense>
+                  <q-select v-model="form.estadoPago" :options="opcionesEstadoPago" label="Estado del pago" outlined dense @update:model-value="alCambiarEstadoPago">
                     <template #prepend><q-icon name="pending_actions" /></template>
                   </q-select>
                 </div>
               </div>
 
-              <q-input v-if="form.estadoPago === 'abono'" v-model.number="form.valorAbono" type="number" label="Monto abonado *" prefix="$" outlined dense class="bg-orange-1 rounded-borders" :rules="[val => (val > 0 && val < form.precio) || 'El abono debe ser mayor a 0 y menor al precio total']">
+              <!-- MONTO ABONADO -->
+              <q-input 
+                v-if="form.estadoPago === 'abono'" 
+                :model-value="formatearMoneda(form.valorAbono)" 
+                @update:model-value="val => form.valorAbono = desformatearNumero(val)" 
+                label="Monto abonado *" 
+                prefix="$" 
+                outlined 
+                dense 
+                class="bg-orange-1 rounded-borders" 
+                :rules="[val => {
+                  const num = desformatearNumero(val);
+                  return (num > 0 && num < form.precio) || 'El abono debe ser mayor a 0 y menor al precio total';
+                }]"
+              >
                 <template #prepend><q-icon name="price_check" color="warning" /></template>
               </q-input>
 
-              <q-select v-if="editandoIndex !== null" v-model="form.estadoEquipo" :options="opcionesEstadoEquipo" label="Estado del equipo" outlined dense>
+              <!-- ESTADO DEL EQUIPO -->
+              <q-select 
+                v-if="editandoIndex !== null" 
+                v-model="form.estadoEquipo" 
+                :options="opcionesEstadoEquipoFiltradas" 
+                label="Estado del equipo" 
+                outlined 
+                dense
+              >
                 <template #prepend><q-icon name="sync" /></template>
               </q-select>
 
-              <q-input v-model="form.observaciones" type="textarea" label="Observaciones (opcional)" hint="Ej: Pantalla partida, viene sin bandeja SIM..." outlined dense rows="2">
+              <q-input 
+                v-model="form.observaciones" 
+                type="textarea" 
+                label="Observaciones (opcional)" 
+                hint="Ej: Pantalla partida, viene sin bandeja SIM..." 
+                outlined 
+                dense 
+                rows="2"
+              >
                 <template #prepend><q-icon name="notes" /></template>
               </q-input>
 
@@ -169,6 +263,7 @@
           </q-card>
         </q-dialog>
 
+        <!-- MODAL ELIMINAR REGISTRO UNICO -->
         <q-dialog v-model="modalEliminarAbierto">
           <q-card class="rounded-borders">
             <q-card-section class="row items-center q-pb-none">
@@ -182,6 +277,25 @@
             </q-card-actions>
           </q-card>
         </q-dialog>
+
+        <!-- MODAL BORRAR TODOS LOS ENTREGADOS -->
+        <q-dialog v-model="modalBorrarEntregadosAbierto">
+          <q-card class="rounded-borders">
+            <q-card-section class="row items-center q-pb-none">
+              <q-avatar icon="delete_sweep" color="negative" text-color="white" class="shadow-1" />
+              <span class="q-ml-md text-subtitle1 text-weight-medium">¿Eliminar todos los servicios entregados?</span>
+            </q-card-section>
+            <q-card-section class="text-body2 text-grey-8 q-pt-sm">
+              Esta acción eliminará de forma permanente todos los registros que ya hayan sido marcados como **entregados**.
+            </q-card-section>
+
+            <q-card-actions align="right" class="q-pa-md">
+              <q-btn flat label="Cancelar" color="grey-7" v-close-popup />
+              <q-btn unelevated label="Sí, eliminar todos" color="negative" @click="borrarServiciosEntregados" v-close-popup />
+            </q-card-actions>
+          </q-card>
+        </q-dialog>
+
       </q-page>
     </q-page-container>
   </q-layout>
@@ -196,6 +310,7 @@ const servicios = useLocalStorage('don_efrain_servicios', [])
 const formRef = ref(null)
 const modalAbierto = ref(false)
 const modalEliminarAbierto = ref(false)
+const modalBorrarEntregadosAbierto = ref(false)
 const editandoIndex = ref(null)
 const eliminarIndex = ref(null)
 
@@ -203,7 +318,7 @@ const form = ref({
   cliente: '',
   marca: 'Samsung',
   modelo: '',
-  tipoReparacion: 'Cambio de pantalla',
+  tipoReparacion: ['Cambio de pantalla'],
   tecnico: 'Don Efraín',
   fechaHora: '',
   precio: 0,
@@ -216,30 +331,47 @@ const form = ref({
 })
 
 const opcionesMarcas = ['Samsung', 'Apple', 'Xiaomi', 'Motorola', 'Huawei', 'Oppo', 'Realme', 'ZTE', 'Otra']
+const opcionesReparacion = [
+  'Cambio de pantalla',
+  'Cambio de batería',
+  'Cambio de pin de carga',
+  'Liberación',
+  'Mantenimiento de software',
+  'Cambio de flex',
+  'Otros'
+]
+const opcionesTecnicos = ['Don Efraín', 'Técnico 1', 'Técnico 2']
+const opcionesMetodoPago = ['efectivo', 'transferencia', 'tarjeta']
+const opcionesEstadoPago = ['pagado', 'pendiente', 'abono']
 
-const modelosPorMarca = {
-  Samsung: ['Galaxy A15', 'Galaxy A25', 'Galaxy A35', 'Galaxy A54', 'Galaxy S21 FE', 'Galaxy S23 Ultra', 'Galaxy S24 Ultra'],
-  Apple: ['iPhone 11', 'iPhone 12', 'iPhone 13', 'iPhone 13 Pro', 'iPhone 14', 'iPhone 15', 'iPhone 15 Pro Max'],
-  Xiaomi: ['Redmi Note 11', 'Redmi Note 12', 'Redmi Note 13', 'Poco X5 Pro', 'Poco X6 Pro', 'Xiaomi 13T'],
-  Motorola: ['Moto G22', 'Moto G32', 'Moto G54', 'Moto G84', 'Edge 40 Neo', 'Edge 50 Pro'],
-  Huawei: ['P30 Lite', 'P40 Lite', 'Y9 Prime', 'Nova 11i', 'Mate 50 Pro'],
-  Oppo: ['Reno 7', 'Reno 10', 'A17', 'A58', 'A78'],
-  Realme: ['Realme C35', 'Realme C55', 'Realme 11 Pro+', 'Realme 12+'],
-  ZTE: ['Blade A52', 'Blade A72', 'V40 Vita', 'Axon 40'],
-  Otra: ['Genérico / Otro']
-}
-
-const modelosDisponibles = computed(() => {
-  return modelosPorMarca[form.value.marca] || ['Genérico / Otro']
+// Verifica si hay servicios con el estado 'entregado'
+const hayEntregados = computed(() => {
+  return servicios.value.some(s => s.estadoEquipo === 'entregado')
 })
 
-function alCambiarMarca() {
-  form.value.modelo = ''
+const opcionesEstadoEquipoFiltradas = computed(() => {
+  const opciones = ['recibido', 'en reparación', 'listo para entregar']
+  if (form.value.estadoPago === 'pagado') {
+    opciones.push('entregado')
+  }
+  return opciones
+})
+
+function formatearMoneda(val) {
+  if (val === null || val === undefined || val === '') return ''
+  const numero = typeof val === 'string' ? desformatearNumero(val) : val
+  return numero.toLocaleString('es-CO')
 }
 
-function crearModeloPersonalizado(val, done) {
-  if (val.length > 0) {
-    done(val, 'add-unique')
+function desformatearNumero(val) {
+  if (!val) return 0
+  const soloNumeros = val.toString().replace(/\D/g, '')
+  return soloNumeros ? parseInt(soloNumeros, 10) : 0
+}
+
+function alCambiarEstadoPago(nuevoEstado) {
+  if (nuevoEstado !== 'pagado' && form.value.estadoEquipo === 'entregado') {
+    form.value.estadoEquipo = 'listo para entregar'
   }
 }
 
@@ -248,7 +380,7 @@ function reiniciarFormulario() {
     cliente: '',
     marca: 'Samsung',
     modelo: '',
-    tipoReparacion: 'Cambio de pantalla',
+    tipoReparacion: ['Cambio de pantalla'],
     tecnico: 'Don Efraín',
     fechaHora: '',
     precio: 0,
@@ -269,11 +401,29 @@ function abrirModalCrear() {
 
 function abrirModalEditar(servicio, index) {
   editandoIndex.value = index
-  form.value = { ...servicio }
+  
+  // Garantizar que tipoReparacion sea un array al cargar para edición
+  let reparaciones = servicio.tipoReparacion
+  if (typeof reparaciones === 'string') {
+    reparaciones = [reparaciones]
+  } else if (!Array.isArray(reparaciones)) {
+    reparaciones = []
+  }
+
+  form.value = {
+    ...servicio,
+    tipoReparacion: reparaciones
+  }
   modalAbierto.value = true
 }
 
 function guardarServicio() {
+  form.value.cliente = form.value.cliente.trim()
+  form.value.modelo = form.value.modelo.trim()
+  if (form.value.observaciones) {
+    form.value.observaciones = form.value.observaciones.trim()
+  }
+
   if (editandoIndex.value === null) {
     const nuevoServicio = {
       ...form.value,
@@ -302,19 +452,13 @@ function eliminarServicio() {
   }
 }
 
-const opcionesReparacion = [
-  'Cambio de pantalla',
-  'Cambio de batería',
-  'Cambio de pin de carga',
-  'Liberación',
-  'Mantenimiento de software',
-  'Cambio de flex',
-  'Otros'
-]
-const opcionesTecnicos = ['Don Efraín', 'Técnico 1', 'Técnico 2']
-const opcionesMetodoPago = ['efectivo', 'transferencia', 'tarjeta']
-const opcionesEstadoPago = ['pagado', 'pendiente', 'abono']
-const opcionesEstadoEquipo = ['recibido', 'en reparación', 'listo para entregar', 'entregado']
+function confirmarBorrarEntregados() {
+  modalBorrarEntregadosAbierto.value = true
+}
+
+function borrarServiciosEntregados() {
+  servicios.value = servicios.value.filter(s => s.estadoEquipo !== 'entregado')
+}
 
 function obtenerColorEstadoEquipo(estado) {
   if (estado === 'recibido') return 'blue-7'
