@@ -372,7 +372,7 @@ const catálogoModelos = {
 }
 const opcionesModelosFiltrados = ref([])
 
-// Reparaciones y sus precios base predeterminados
+// Reparaciones: "Otros" se define en 0 para no asignar valor por defecto
 const catalogoReparaciones = [
   { nombre: 'Cambio de pantalla', precio: 120000 },
   { nombre: 'Cambio de batería', precio: 60000 },
@@ -380,13 +380,15 @@ const catalogoReparaciones = [
   { nombre: 'Liberación', precio: 40000 },
   { nombre: 'Mantenimiento de software', precio: 30000 },
   { nombre: 'Cambio de flex', precio: 45000 },
-  { nombre: 'Otros', precio: 25000 }
+  { nombre: 'Otros', precio: 0 }
 ]
 
 const opcionesReparacionConPrecios = computed(() => {
   return catalogoReparaciones.map(item => ({
     nombre: item.nombre,
-    label: `${item.nombre} ($${formatearMoneda(item.precio)})`
+    label: item.precio > 0 
+      ? `${item.nombre} ($${formatearMoneda(item.precio)})` 
+      : item.nombre
   }))
 })
 
@@ -436,15 +438,21 @@ function alCambiarMarca(nuevaMarca) {
   opcionesModelosFiltrados.value = catálogoModelos[nuevaMarca] || []
 }
 
-// Suma de precios al seleccionar reparaciones
+// Suma de precios al seleccionar reparaciones (respetando "Otros" como 0)
 function alCambiarReparaciones(seleccionadas) {
   if (!Array.isArray(seleccionadas)) return
+  
   let totalCalculado = 0
   seleccionadas.forEach(nombreRep => {
     const item = catalogoReparaciones.find(r => r.nombre === nombreRep)
     if (item) totalCalculado += item.precio
   })
-  form.value.precio = totalCalculado
+  
+  if (totalCalculado > 0) {
+    form.value.precio = totalCalculado
+  } else if (seleccionadas.length === 1 && seleccionadas[0] === 'Otros') {
+    if (form.value.precio === 0) form.value.precio = 0
+  }
 }
 
 function formatearMoneda(val) {
