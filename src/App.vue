@@ -8,7 +8,6 @@
           <div class="text-caption text-weight-regular text-grey-4">Servicio Técnico Móvil</div>
         </q-toolbar-title>
 
-   
         <q-btn
           color="negative"
           icon="cleaning_services"
@@ -66,7 +65,6 @@
               <q-separator />
 
               <q-card-section class="q-py-sm text-body1 q-gutter-xs">
-              
                 <div>
                   <span class="text-weight-bold block q-mb-xs">Reparaciones:</span>
                   <template v-if="Array.isArray(servicio.tipoReparacion) && servicio.tipoReparacion.length">
@@ -85,7 +83,6 @@
                 </div>
 
                 <div><span class="text-weight-bold">Técnico:</span> {{ servicio.tecnico }}</div>
-                
                 <div><span class="text-weight-bold">Fecha:</span> {{ servicio.fecha }}</div>
                 <div><span class="text-weight-bold">Hora:</span> {{ servicio.hora }}</div>
 
@@ -131,7 +128,6 @@
           <q-btn fab icon="add" color="secondary" @click="abrirModalCrear" class="shadow-4" />
         </q-page-sticky>
 
-    
         <q-dialog v-model="modalAbierto" persistent transition-show="scale" transition-hide="scale">
           <q-card style="width: 550px; max-width: 95vw;" class="rounded-borders">
             <q-card-section class="row items-center bg-primary text-white q-py-sm">
@@ -147,41 +143,70 @@
                 label="Nombre del cliente *" 
                 outlined 
                 dense 
-                :rules="[val => (val && val.trim().length > 0) || 'Ingrese un nombre válido (no solo espacios)']" 
+                :rules="[val => (val && val.trim().length > 0) || 'Ingrese un nombre válido']" 
               >
                 <template #prepend><q-icon name="person" /></template>
               </q-input>
 
               <div class="row q-col-gutter-sm">
+                <!-- Seleccionar o escribir Marca -->
                 <div class="col-6">
-                  <q-select v-model="form.marca" :options="opcionesMarcas" label="Marca *" outlined dense :rules="[val => !!val || 'Seleccione una marca']">
+                  <q-select
+                    v-model="form.marca"
+                    use-input
+                    fill-input
+                    hide-selected
+                    input-debounce="0"
+                    :options="opcionesMarcasFiltradas"
+                    label="Marca *"
+                    outlined
+                    dense
+                    @filter="filtrarMarcas"
+                    @input-value="val => form.marca = val"
+                    @update:model-value="alCambiarMarca"
+                    :rules="[val => !!val || 'Seleccione o escriba una marca']"
+                  >
                     <template #prepend><q-icon name="branding_watermark" /></template>
                   </q-select>
                 </div>
+
+                <!-- Seleccionar o escribir Modelo -->
                 <div class="col-6">
-                  <q-input 
-                    v-model="form.modelo" 
-                    label="Modelo *" 
-                    hint="Ej: Galaxy A15, iPhone 13" 
-                    outlined 
-                    dense 
-                    :rules="[val => (val && val.trim().length > 0) || 'Escriba un modelo válido']"
+                  <q-select
+                    v-model="form.modelo"
+                    use-input
+                    fill-input
+                    hide-selected
+                    input-debounce="0"
+                    :options="opcionesModelosFiltrados"
+                    label="Modelo *"
+                    hint="Seleccione o escriba"
+                    outlined
+                    dense
+                    @filter="filtrarModelos"
+                    @input-value="val => form.modelo = val"
+                    :rules="[val => !!val || 'Escriba o seleccione un modelo']"
                   >
                     <template #prepend><q-icon name="smartphone" /></template>
-                  </q-input>
+                  </q-select>
                 </div>
               </div>
 
-              
+              <!-- Tipo de Reparación con precios -->
               <q-select 
                 v-model="form.tipoReparacion" 
-                :options="opcionesReparacion" 
+                :options="opcionesReparacionConPrecios" 
+                option-value="nombre"
+                option-label="label"
+                emit-value
+                map-options
                 label="Tipo(s) de reparación *" 
                 placeholder="Seleccione una o varias..."
                 multiple 
                 use-chips 
                 outlined 
                 dense 
+                @update:model-value="alCambiarReparaciones"
                 :rules="[val => (Array.isArray(val) && val.length > 0) || 'Seleccione al menos una reparación']"
               >
                 <template #prepend><q-icon name="build" /></template>
@@ -216,7 +241,6 @@
                 </div>
               </div>
 
-  
               <q-input 
                 v-if="form.estadoPago === 'abono'" 
                 :model-value="formatearMoneda(form.valorAbono)" 
@@ -234,7 +258,6 @@
                 <template #prepend><q-icon name="price_check" color="warning" /></template>
               </q-input>
 
-       
               <q-select 
                 v-if="editandoIndex !== null" 
                 v-model="form.estadoEquipo" 
@@ -332,16 +355,41 @@ const form = ref({
   observaciones: ''
 })
 
-const opcionesMarcas = ['Samsung', 'Apple', 'Xiaomi', 'Motorola', 'Huawei', 'Oppo', 'Realme', 'ZTE', 'Otra']
-const opcionesReparacion = [
-  'Cambio de pantalla',
-  'Cambio de batería',
-  'Cambio de pin de carga',
-  'Liberación',
-  'Mantenimiento de software',
-  'Cambio de flex',
-  'Otros'
+// Catálogo base de marcas
+const listaMarcasBase = ['Samsung', 'Apple', 'Xiaomi', 'Motorola', 'Huawei', 'Oppo', 'Realme', 'ZTE', 'Honor', 'Infinix']
+const opcionesMarcasFiltradas = ref([...listaMarcasBase])
+
+// Catálogo de modelos según la marca seleccionada
+const catálogoModelos = {
+  Samsung: ['Galaxy A15', 'Galaxy A25', 'Galaxy A35', 'Galaxy A54', 'Galaxy S21', 'Galaxy S22', 'Galaxy S23', 'Galaxy S24', 'Galaxy Note 20'],
+  Apple: ['iPhone 11', 'iPhone 12', 'iPhone 13', 'iPhone 14', 'iPhone 15', 'iPhone 15 Pro', 'iPhone SE'],
+  Xiaomi: ['Redmi Note 11', 'Redmi Note 12', 'Redmi Note 13', 'Poco X5', 'Poco F5', 'Xiaomi 13T'],
+  Motorola: ['Moto G23', 'Moto G54', 'Moto G84', 'Edge 40', 'Edge 30 Neo', 'Moto E13'],
+  Huawei: ['P30 Lite', 'P40 Pro', 'Y9 Prime', 'Nova 11', 'Mate 40 Pro'],
+  Oppo: ['Reno 10', 'A58', 'A78', 'A17'],
+  Realme: ['Realme 11 Pro', 'Realme C55', 'Realme C33'],
+  ZTE: ['Blade A53', 'Blade V40', 'Axon 40']
+}
+const opcionesModelosFiltrados = ref([])
+
+// Reparaciones y sus precios base predeterminados
+const catalogoReparaciones = [
+  { nombre: 'Cambio de pantalla', precio: 120000 },
+  { nombre: 'Cambio de batería', precio: 60000 },
+  { nombre: 'Cambio de pin de carga', precio: 35000 },
+  { nombre: 'Liberación', precio: 40000 },
+  { nombre: 'Mantenimiento de software', precio: 30000 },
+  { nombre: 'Cambio de flex', precio: 45000 },
+  { nombre: 'Otros', precio: 25000 }
 ]
+
+const opcionesReparacionConPrecios = computed(() => {
+  return catalogoReparaciones.map(item => ({
+    nombre: item.nombre,
+    label: `${item.nombre} ($${formatearMoneda(item.precio)})`
+  }))
+})
+
 const opcionesTecnicos = ['Don Efraín', 'Técnico 1', 'Técnico 2']
 const opcionesMetodoPago = ['efectivo', 'transferencia', 'tarjeta']
 const opcionesEstadoPago = ['pagado', 'pendiente', 'abono']
@@ -357,6 +405,47 @@ const opcionesEstadoEquipoFiltradas = computed(() => {
   }
   return opciones
 })
+
+// Filtrado interactivo para lista de Marcas
+function filtrarMarcas(val, update) {
+  update(() => {
+    if (val === '') {
+      opcionesMarcasFiltradas.value = listaMarcasBase
+    } else {
+      const needle = val.toLowerCase()
+      opcionesMarcasFiltradas.value = listaMarcasBase.filter(v => v.toLowerCase().indexOf(needle) > -1)
+    }
+  })
+}
+
+// Filtrado interactivo para lista de Modelos
+function filtrarModelos(val, update) {
+  update(() => {
+    const modelosDisponibles = catálogoModelos[form.value.marca] || []
+    if (val === '') {
+      opcionesModelosFiltrados.value = modelosDisponibles
+    } else {
+      const needle = val.toLowerCase()
+      opcionesModelosFiltrados.value = modelosDisponibles.filter(v => v.toLowerCase().indexOf(needle) > -1)
+    }
+  })
+}
+
+function alCambiarMarca(nuevaMarca) {
+  form.value.modelo = ''
+  opcionesModelosFiltrados.value = catálogoModelos[nuevaMarca] || []
+}
+
+// Suma de precios al seleccionar reparaciones
+function alCambiarReparaciones(seleccionadas) {
+  if (!Array.isArray(seleccionadas)) return
+  let totalCalculado = 0
+  seleccionadas.forEach(nombreRep => {
+    const item = catalogoReparaciones.find(r => r.nombre === nombreRep)
+    if (item) totalCalculado += item.precio
+  })
+  form.value.precio = totalCalculado
+}
 
 function formatearMoneda(val) {
   if (val === null || val === undefined || val === '') return ''
@@ -381,7 +470,7 @@ function reiniciarFormulario() {
     cliente: '',
     marca: 'Samsung',
     modelo: '',
-    tipoReparacion: [], // Garantizar array vacío para nuevos registros
+    tipoReparacion: [],
     tecnico: 'Don Efraín',
     fecha: '',
     hora: '',
@@ -393,6 +482,7 @@ function reiniciarFormulario() {
     calificacion: 5,
     observaciones: ''
   }
+  opcionesModelosFiltrados.value = catálogoModelos['Samsung']
 }
 
 function abrirModalCrear() {
@@ -415,6 +505,8 @@ function abrirModalEditar(servicio, index) {
     ...servicio,
     tipoReparacion: reparaciones
   }
+  
+  opcionesModelosFiltrados.value = catálogoModelos[servicio.marca] || []
   modalAbierto.value = true
 }
 
