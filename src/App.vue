@@ -100,9 +100,21 @@
                   </q-badge>
                 </div>
 
+                <!-- Calificación del cliente: Sin calificar por defecto, se bloquea una vez seleccionada -->
                 <div v-if="servicio.estadoEquipo === 'entregado'" class="q-mt-sm bg-grey-3 q-pa-sm rounded-borders text-center shadow-1">
                   <div class="text-weight-bold text-grey-9 text-caption">Calificación del cliente</div>
-                  <q-rating v-model="servicio.calificacion" max="5" size="1.8em" color="amber-9" icon="star_border" icon-selected="star" />
+                  <q-rating 
+                    v-model="servicio.calificacion" 
+                    max="5" 
+                    size="1.8em" 
+                    color="amber-9" 
+                    icon="star_border" 
+                    icon-selected="star" 
+                    :readonly="servicio.calificacion > 0"
+                  />
+                  <div v-if="servicio.calificacion === 0" class="text-caption text-grey-7 text-italic q-mt-xs">
+                    Sin calificar
+                  </div>
                 </div>
 
                 <div v-if="servicio.observaciones" class="q-mt-xs text-italic text-grey-8 bg-grey-2 q-pa-xs rounded-borders">
@@ -110,16 +122,18 @@
                 </div>
               </q-card-section>
 
-              <q-separator />
-
-              <q-card-actions align="right" class="bg-grey-1">
-                <q-btn flat round color="primary" icon="edit" :disable="servicio.estadoEquipo === 'entregado'" @click="abrirModalEditar(servicio, index)">
-                  <q-tooltip>{{ servicio.estadoEquipo === 'entregado' ? 'Un servicio entregado no se puede editar' : 'Editar' }}</q-tooltip>
-                </q-btn>
-                <q-btn flat round color="negative" icon="delete" :disable="servicio.estadoEquipo === 'entregado'" @click="confirmarEliminacion(index)">
-                  <q-tooltip>{{ servicio.estadoEquipo === 'entregado' ? 'Un servicio entregado no se puede eliminar' : 'Eliminar' }}</q-tooltip>
-                </q-btn>
-              </q-card-actions>
+              <!-- Se ocultan los botones cuando el estado del equipo es 'entregado' -->
+              <template v-if="servicio.estadoEquipo !== 'entregado'">
+                <q-separator />
+                <q-card-actions align="right" class="bg-grey-1">
+                  <q-btn flat round color="primary" icon="edit" @click="abrirModalEditar(servicio, index)">
+                    <q-tooltip>Editar</q-tooltip>
+                  </q-btn>
+                  <q-btn flat round color="negative" icon="delete" @click="confirmarEliminacion(index)">
+                    <q-tooltip>Eliminar</q-tooltip>
+                  </q-btn>
+                </q-card-actions>
+              </template>
             </q-card>
           </div>
         </div>
@@ -149,7 +163,6 @@
               </q-input>
 
               <div class="row q-col-gutter-sm">
-                <!-- Seleccionar o escribir Marca -->
                 <div class="col-6">
                   <q-select
                     v-model="form.marca"
@@ -170,7 +183,6 @@
                   </q-select>
                 </div>
 
-                <!-- Seleccionar o escribir Modelo -->
                 <div class="col-6">
                   <q-select
                     v-model="form.modelo"
@@ -192,7 +204,7 @@
                 </div>
               </div>
 
-              <!-- Tipo de Reparación con precios -->
+              <!-- Seleccionar Reparaciones -->
               <q-select 
                 v-model="form.tipoReparacion" 
                 :options="opcionesReparacionConPrecios" 
@@ -211,6 +223,20 @@
               >
                 <template #prepend><q-icon name="build" /></template>
               </q-select>
+
+              <!-- Campo habilitado para escribir el detalle en caso de elegir "Otros" -->
+              <q-input 
+                v-if="form.tipoReparacion.includes('Otros')"
+                v-model="reparacionOtraTexto"
+                label="Especifique la otra reparación *"
+                placeholder="Ej: Cambio de cámara trasera"
+                outlined
+                dense
+                class="q-mt-sm"
+                :rules="[val => (val && val.trim().length > 0) || 'Escriba el tipo de reparación']"
+              >
+                <template #prepend><q-icon name="edit" /></template>
+              </q-input>
 
               <q-select v-model="form.tecnico" :options="opcionesTecnicos" label="Técnico que atendió *" outlined dense :rules="[val => !!val || 'Seleccione un técnico']">
                 <template #prepend><q-icon name="badge" /></template>
@@ -338,6 +364,8 @@ const modalBorrarEntregadosAbierto = ref(false)
 const editandoIndex = ref(null)
 const eliminarIndex = ref(null)
 
+const reparacionOtraTexto = ref('')
+
 const form = ref({
   cliente: '',
   marca: 'Samsung',
@@ -351,15 +379,13 @@ const form = ref({
   metodoPago: 'efectivo',
   estadoPago: 'pendiente',
   estadoEquipo: 'recibido',
-  calificacion: 5,
+  calificacion: 0, // Calificación inicial en 0 (sin estrellas seleccionadas)
   observaciones: ''
 })
 
-// Catálogo base de marcas
 const listaMarcasBase = ['Samsung', 'Apple', 'Xiaomi', 'Motorola', 'Huawei', 'Oppo', 'Realme', 'ZTE', 'Honor', 'Infinix']
 const opcionesMarcasFiltradas = ref([...listaMarcasBase])
 
-// Catálogo de modelos según la marca seleccionada
 const catálogoModelos = {
   Samsung: ['Galaxy A15', 'Galaxy A25', 'Galaxy A35', 'Galaxy A54', 'Galaxy S21', 'Galaxy S22', 'Galaxy S23', 'Galaxy S24', 'Galaxy Note 20'],
   Apple: ['iPhone 11', 'iPhone 12', 'iPhone 13', 'iPhone 14', 'iPhone 15', 'iPhone 15 Pro', 'iPhone SE'],
@@ -372,7 +398,6 @@ const catálogoModelos = {
 }
 const opcionesModelosFiltrados = ref([])
 
-// Reparaciones: "Otros" se define en 0 para no asignar valor por defecto
 const catalogoReparaciones = [
   { nombre: 'Cambio de pantalla', precio: 120000 },
   { nombre: 'Cambio de batería', precio: 60000 },
@@ -408,7 +433,6 @@ const opcionesEstadoEquipoFiltradas = computed(() => {
   return opciones
 })
 
-// Filtrado interactivo para lista de Marcas
 function filtrarMarcas(val, update) {
   update(() => {
     if (val === '') {
@@ -420,7 +444,6 @@ function filtrarMarcas(val, update) {
   })
 }
 
-// Filtrado interactivo para lista de Modelos
 function filtrarModelos(val, update) {
   update(() => {
     const modelosDisponibles = catálogoModelos[form.value.marca] || []
@@ -438,7 +461,6 @@ function alCambiarMarca(nuevaMarca) {
   opcionesModelosFiltrados.value = catálogoModelos[nuevaMarca] || []
 }
 
-// Suma de precios al seleccionar reparaciones (respetando "Otros" como 0)
 function alCambiarReparaciones(seleccionadas) {
   if (!Array.isArray(seleccionadas)) return
   
@@ -452,6 +474,10 @@ function alCambiarReparaciones(seleccionadas) {
     form.value.precio = totalCalculado
   } else if (seleccionadas.length === 1 && seleccionadas[0] === 'Otros') {
     if (form.value.precio === 0) form.value.precio = 0
+  }
+
+  if (!seleccionadas.includes('Otros')) {
+    reparacionOtraTexto.value = ''
   }
 }
 
@@ -487,9 +513,10 @@ function reiniciarFormulario() {
     metodoPago: 'efectivo',
     estadoPago: 'pendiente',
     estadoEquipo: 'recibido',
-    calificacion: 5,
+    calificacion: 0,
     observaciones: ''
   }
+  reparacionOtraTexto.value = ''
   opcionesModelosFiltrados.value = catálogoModelos['Samsung']
 }
 
@@ -511,9 +538,10 @@ function abrirModalEditar(servicio, index) {
 
   form.value = {
     ...servicio,
-    tipoReparacion: reparaciones
+    tipoReparacion: [...reparaciones]
   }
   
+  reparacionOtraTexto.value = ''
   opcionesModelosFiltrados.value = catálogoModelos[servicio.marca] || []
   modalAbierto.value = true
 }
@@ -525,6 +553,14 @@ function guardarServicio() {
     form.value.observaciones = form.value.observaciones.trim()
   }
 
+  // Reemplazar la opción "Otros" por el texto personalizado ingresado
+  const reparacionesFinales = form.value.tipoReparacion.map(rep => {
+    if (rep === 'Otros' && reparacionOtraTexto.value.trim() !== '') {
+      return reparacionOtraTexto.value.trim()
+    }
+    return rep
+  })
+
   const ahora = new Date()
   const fechaActual = ahora.toLocaleDateString('es-CO')
   const horaActual = ahora.toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit', hour12: true })
@@ -532,6 +568,7 @@ function guardarServicio() {
   if (editandoIndex.value === null) {
     const nuevoServicio = {
       ...form.value,
+      tipoReparacion: reparacionesFinales,
       id: Date.now(),
       estadoEquipo: 'recibido',
       fecha: fechaActual,
@@ -539,7 +576,10 @@ function guardarServicio() {
     }
     servicios.value.push(nuevoServicio)
   } else {
-    servicios.value[editandoIndex.value] = { ...form.value }
+    servicios.value[editandoIndex.value] = { 
+      ...form.value,
+      tipoReparacion: reparacionesFinales 
+    }
   }
 
   modalAbierto.value = false
