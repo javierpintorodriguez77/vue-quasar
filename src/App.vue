@@ -8,7 +8,7 @@
           <div class="text-caption text-weight-regular text-grey-4">Servicio Técnico Móvil</div>
         </q-toolbar-title>
 
-        <!-- BOTÓN PARA BORRAR ENTREGADOS -->
+   
         <q-btn
           color="negative"
           icon="cleaning_services"
@@ -66,7 +66,7 @@
               <q-separator />
 
               <q-card-section class="q-py-sm text-body1 q-gutter-xs">
-                <!-- VISUALIZACIÓN DE MÚLTIPLES REPARACIONES -->
+              
                 <div>
                   <span class="text-weight-bold block q-mb-xs">Reparaciones:</span>
                   <template v-if="Array.isArray(servicio.tipoReparacion) && servicio.tipoReparacion.length">
@@ -74,7 +74,7 @@
                       {{ rep }}
                     </q-chip>
                   </template>
-                  <template v-else-if="typeof servicio.tipoReparacion === 'string'">
+                  <template v-else-if="typeof servicio.tipoReparacion === 'string' && servicio.tipoReparacion">
                     <q-chip dense color="primary" text-color="white" icon="build" size="sm">
                       {{ servicio.tipoReparacion }}
                     </q-chip>
@@ -85,7 +85,10 @@
                 </div>
 
                 <div><span class="text-weight-bold">Técnico:</span> {{ servicio.tecnico }}</div>
-                <div><span class="text-weight-bold">Fecha/Hora:</span> {{ servicio.fechaHora }}</div>
+                
+                <div><span class="text-weight-bold">Fecha:</span> {{ servicio.fecha }}</div>
+                <div><span class="text-weight-bold">Hora:</span> {{ servicio.hora }}</div>
+
                 <div><span class="text-weight-bold">Precio Total:</span> <span class="text-weight-bolder">${{ formatearMoneda(servicio.precio) }}</span></div>
 
                 <div v-if="servicio.estadoPago === 'abono'" class="bg-orange-2 q-pa-xs rounded-borders">
@@ -128,7 +131,7 @@
           <q-btn fab icon="add" color="secondary" @click="abrirModalCrear" class="shadow-4" />
         </q-page-sticky>
 
-        <!-- MODAL FORMULARIO -->
+    
         <q-dialog v-model="modalAbierto" persistent transition-show="scale" transition-hide="scale">
           <q-card style="width: 550px; max-width: 95vw;" class="rounded-borders">
             <q-card-section class="row items-center bg-primary text-white q-py-sm">
@@ -169,11 +172,12 @@
                 </div>
               </div>
 
-              <!-- SELECCIÓN MÚLTIPLE DE REPARACIONES -->
+              
               <q-select 
                 v-model="form.tipoReparacion" 
                 :options="opcionesReparacion" 
                 label="Tipo(s) de reparación *" 
+                placeholder="Seleccione una o varias..."
                 multiple 
                 use-chips 
                 outlined 
@@ -187,7 +191,6 @@
                 <template #prepend><q-icon name="badge" /></template>
               </q-select>
 
-              <!-- PRECIO TOTAL -->
               <q-input 
                 :model-value="formatearMoneda(form.precio)" 
                 @update:model-value="val => form.precio = desformatearNumero(val)" 
@@ -213,7 +216,7 @@
                 </div>
               </div>
 
-              <!-- MONTO ABONADO -->
+  
               <q-input 
                 v-if="form.estadoPago === 'abono'" 
                 :model-value="formatearMoneda(form.valorAbono)" 
@@ -231,7 +234,7 @@
                 <template #prepend><q-icon name="price_check" color="warning" /></template>
               </q-input>
 
-              <!-- ESTADO DEL EQUIPO -->
+       
               <q-select 
                 v-if="editandoIndex !== null" 
                 v-model="form.estadoEquipo" 
@@ -263,7 +266,6 @@
           </q-card>
         </q-dialog>
 
-        <!-- MODAL ELIMINAR REGISTRO UNICO -->
         <q-dialog v-model="modalEliminarAbierto">
           <q-card class="rounded-borders">
             <q-card-section class="row items-center q-pb-none">
@@ -278,7 +280,6 @@
           </q-card>
         </q-dialog>
 
-        <!-- MODAL BORRAR TODOS LOS ENTREGADOS -->
         <q-dialog v-model="modalBorrarEntregadosAbierto">
           <q-card class="rounded-borders">
             <q-card-section class="row items-center q-pb-none">
@@ -318,9 +319,10 @@ const form = ref({
   cliente: '',
   marca: 'Samsung',
   modelo: '',
-  tipoReparacion: ['Cambio de pantalla'],
+  tipoReparacion: [], 
   tecnico: 'Don Efraín',
-  fechaHora: '',
+  fecha: '',
+  hora: '',
   precio: 0,
   valorAbono: 0,
   metodoPago: 'efectivo',
@@ -344,7 +346,6 @@ const opcionesTecnicos = ['Don Efraín', 'Técnico 1', 'Técnico 2']
 const opcionesMetodoPago = ['efectivo', 'transferencia', 'tarjeta']
 const opcionesEstadoPago = ['pagado', 'pendiente', 'abono']
 
-// Verifica si hay servicios con el estado 'entregado'
 const hayEntregados = computed(() => {
   return servicios.value.some(s => s.estadoEquipo === 'entregado')
 })
@@ -380,9 +381,10 @@ function reiniciarFormulario() {
     cliente: '',
     marca: 'Samsung',
     modelo: '',
-    tipoReparacion: ['Cambio de pantalla'],
+    tipoReparacion: [], // Garantizar array vacío para nuevos registros
     tecnico: 'Don Efraín',
-    fechaHora: '',
+    fecha: '',
+    hora: '',
     precio: 0,
     valorAbono: 0,
     metodoPago: 'efectivo',
@@ -402,10 +404,9 @@ function abrirModalCrear() {
 function abrirModalEditar(servicio, index) {
   editandoIndex.value = index
   
-  // Garantizar que tipoReparacion sea un array al cargar para edición
   let reparaciones = servicio.tipoReparacion
   if (typeof reparaciones === 'string') {
-    reparaciones = [reparaciones]
+    reparaciones = reparaciones ? [reparaciones] : []
   } else if (!Array.isArray(reparaciones)) {
     reparaciones = []
   }
@@ -424,12 +425,17 @@ function guardarServicio() {
     form.value.observaciones = form.value.observaciones.trim()
   }
 
+  const ahora = new Date()
+  const fechaActual = ahora.toLocaleDateString('es-CO')
+  const horaActual = ahora.toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit', hour12: true })
+
   if (editandoIndex.value === null) {
     const nuevoServicio = {
       ...form.value,
       id: Date.now(),
       estadoEquipo: 'recibido',
-      fechaHora: new Date().toLocaleString('es-CO')
+      fecha: fechaActual,
+      hora: horaActual
     }
     servicios.value.push(nuevoServicio)
   } else {
